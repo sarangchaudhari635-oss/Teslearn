@@ -57,5 +57,5 @@ def build_notes_diagram_prompt(topic: str) -> str:
 
 
 def build_virtual_lab_prompt(topic: str) -> str:
-    example = (ROOT / "virtual_lab_3d.html").read_text(encoding="utf-8")
+    example = (ROOT / "virtual_lab.html").read_text(encoding="utf-8")
     return load_prompt("virtual_lab", topic=topic, example=example)
