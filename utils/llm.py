@@ -162,8 +162,8 @@ def generate_comic_script(topic: str) -> dict:
         raise ValueError("comic must have exactly 2 pages")
     for page in pages:
         panels = page.get("panels") or []
-        if len(panels) != 2:
-            raise ValueError("each comic page must have exactly 2 panels")
+        if len(panels) != 1:
+            raise ValueError("each comic page must have exactly 1 panel")
     return data
 
 
@@ -174,8 +174,8 @@ def make_comic_image_prompts(script: dict) -> dict:
         temperature=0.3,
     )
     panels = data.get("panels") or []
-    if len(panels) != 4:
-        raise ValueError("prompt maker must return exactly 4 panels")
+    if len(panels) != 2:
+        raise ValueError("prompt maker must return exactly 2 panels")
     for p in panels:
         if not p.get("image_prompt"):
             raise ValueError("each panel needs image_prompt")

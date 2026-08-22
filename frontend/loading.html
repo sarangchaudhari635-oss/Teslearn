@@ -37,6 +37,12 @@
         <div class="eta-bar" aria-hidden="true"><div class="eta-bar-fill" id="etaFill"></div></div>
       </div>
 
+      <ul class="load-steps" id="steps">
+        <li class="active" data-step="guard">Checking content safety</li>
+        <li data-step="api">Calling AI backend</li>
+        <li data-step="done">Opening your resource</li>
+      </ul>
+
       <p id="err" class="alert hidden"></p>
       <a href="resources.html" id="back" class="btn btn-ghost hidden">← Back to resources</a>
     </div>
@@ -71,18 +77,31 @@
     document.getElementById('msg').textContent = labels[kind] || 'Loading…';
     document.getElementById('topic').textContent = topic;
 
+    function setStep(name) {
+      document.querySelectorAll('.load-steps li').forEach((li) => {
+        li.classList.toggle('active', li.dataset.step === name);
+        li.classList.toggle('done', ['guard', 'api', 'done'].indexOf(li.dataset.step) <
+          ['guard', 'api', 'done'].indexOf(name));
+      });
+    }
+
     function fail(e) {
       document.getElementById('err').textContent = e.message || String(e);
       document.getElementById('err').classList.remove('hidden');
       document.getElementById('back').classList.remove('hidden');
       document.getElementById('lottieWrap')?.classList.add('hidden');
       document.getElementById('etaWrap')?.classList.add('hidden');
+      document.getElementById('steps')?.classList.add('hidden');
     }
 
     (async () => {
       const stopEta = startSimulatedEta(kind);
       try {
+        setStep('guard');
+        await new Promise((r) => setTimeout(r, 400));
+        setStep('api');
         const result = await loadResource(kind, topic);
+        setStep('done');
         Store.result = result;
         stopEta();
         await new Promise((r) => setTimeout(r, 500));

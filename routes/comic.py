@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -27,6 +28,7 @@ class ComicResponse(BaseModel):
     title: str
     image_urls: list[str]
     panels: list[ComicPanel] = []
+    created_at: datetime | None = None
 
 
 def _urls_from_row(row: Comic) -> list[str]:
@@ -35,9 +37,7 @@ def _urls_from_row(row: Comic) -> list[str]:
         return [f"{settings.base_url}/comics/{row.id}/{name}" for name in rels]
     return [
         f"{settings.base_url}/comics/{row.id}/p1_1.png",
-        f"{settings.base_url}/comics/{row.id}/p1_2.png",
         f"{settings.base_url}/comics/{row.id}/p2_1.png",
-        f"{settings.base_url}/comics/{row.id}/p2_2.png",
     ]
 
 
@@ -86,6 +86,7 @@ def _response_from_row(row: Comic) -> ComicResponse:
         title=row.title,
         image_urls=urls,
         panels=_panels_from_meta(row.id, urls),
+        created_at=row.created_at,
     )
 
 
@@ -101,6 +102,7 @@ def create_comic(body: ComicRequest, session: Session = Depends(get_session)):
     )
     session.add(row)
     session.commit()
+    session.refresh(row)
     panels = _panels_from_build_meta(meta)
     return ComicResponse(
         id=comic_id,
@@ -108,6 +110,7 @@ def create_comic(body: ComicRequest, session: Session = Depends(get_session)):
         title=meta["title"],
         image_urls=meta["image_urls"],
         panels=panels,
+        created_at=row.created_at,
     )
 
 

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
@@ -18,18 +20,22 @@ class LabResponse(BaseModel):
     id: str
     topic: str
     html_url: str
+    created_at: datetime | None = None
 
 
 @router.post("", response_model=LabResponse)
 def create_lab(body: LabRequest, session: Session = Depends(get_session)):
     html = generate_virtual_lab_html(body.topic)
     lab_id, path = save_lab(html)
-    session.add(Lab(id=lab_id, topic=body.topic, filename=path.name))
+    row = Lab(id=lab_id, topic=body.topic, filename=path.name)
+    session.add(row)
     session.commit()
+    session.refresh(row)
     return LabResponse(
         id=lab_id,
         topic=body.topic,
         html_url=f"{settings.base_url}/labs/{path.name}",
+        created_at=row.created_at,
     )
 
 
@@ -41,6 +47,7 @@ def list_labs(session: Session = Depends(get_session)):
             id=r.id,
             topic=r.topic,
             html_url=f"{settings.base_url}/labs/{r.filename}",
+            created_at=r.created_at,
         )
         for r in rows
     ]
@@ -55,4 +62,5 @@ def get_lab(lab_id: str, session: Session = Depends(get_session)):
         id=row.id,
         topic=row.topic,
         html_url=f"{settings.base_url}/labs/{row.filename}",
+        created_at=row.created_at,
     )

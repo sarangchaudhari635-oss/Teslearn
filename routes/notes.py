@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -22,6 +23,7 @@ class NotesResponse(BaseModel):
     handwritten_urls: list[str]
     diagram_urls: list[str]
     images_status: str  # pending | generating | ready | failed
+    created_at: datetime | None = None
 
 
 def _to_response(row: Note) -> NotesResponse:
@@ -32,6 +34,7 @@ def _to_response(row: Note) -> NotesResponse:
         handwritten_urls=json.loads(row.handwritten_json or "[]"),
         diagram_urls=json.loads(row.diagrams_json or "[]"),
         images_status=row.images_status,
+        created_at=row.created_at,
     )
 
 

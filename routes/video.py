@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
@@ -21,6 +23,7 @@ class VideoResponse(BaseModel):
     duration: int
     embed_url: str
     iframe: str
+    created_at: datetime | None = None
 
 
 @router.post("", response_model=VideoResponse)
@@ -30,6 +33,7 @@ def create_video(body: VideoRequest, session: Session = Depends(get_session)):
     clip = Clip(id=clip_id, topic=body.topic, duration=body.duration, filename=path.name)
     session.add(clip)
     session.commit()
+    session.refresh(clip)
 
     embed_url = f"{settings.base_url}/clips/{clip_id}.html"
     return VideoResponse(
@@ -38,6 +42,7 @@ def create_video(body: VideoRequest, session: Session = Depends(get_session)):
         duration=body.duration,
         embed_url=embed_url,
         iframe=f'<iframe src="{embed_url}" width="960" height="540" frameborder="0" allowfullscreen></iframe>',
+        created_at=clip.created_at,
     )
 
 
@@ -51,6 +56,7 @@ def list_videos(session: Session = Depends(get_session)):
             duration=c.duration,
             embed_url=f"{settings.base_url}/clips/{c.filename}",
             iframe=f'<iframe src="{settings.base_url}/clips/{c.filename}" width="960" height="540" frameborder="0" allowfullscreen></iframe>',
+            created_at=c.created_at,
         )
         for c in clips
     ]
@@ -68,4 +74,5 @@ def get_video(clip_id: str, session: Session = Depends(get_session)):
         duration=clip.duration,
         embed_url=url,
         iframe=f'<iframe src="{url}" width="960" height="540" frameborder="0" allowfullscreen></iframe>',
+        created_at=clip.created_at,
     )

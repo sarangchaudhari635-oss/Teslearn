@@ -14,6 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <script src="js/markdown.js"></script>
+  <script src="js/comic-book.js"></script>
 </head>
 <body>
   <div class="mesh-bg" aria-hidden="true"></div>
@@ -75,38 +76,11 @@
         break;
       case 'comic':
         kicker.textContent = 'Comic';
-        box.style.padding = '1rem';
-        box.innerHTML = renderComicPanels(r);
+        box.className = 'card result-frame comic-result';
+        ComicBook.mount(box, r);
         break;
       default:
         box.innerHTML = '<p class="muted" style="padding:1.5rem">No preview for this resource.</p>';
-    }
-
-    function escapeHtml(text) {
-      return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function renderComicPanels(result) {
-      const panels = (result.panels && result.panels.length)
-        ? result.panels
-        : (result.image_urls || []).map((url) => ({ url, caption: '', dialogue: '' }));
-
-      return panels.map((panel) => {
-        const caption = panel.caption
-          ? `<div class="comic-caption">${escapeHtml(panel.caption)}</div>`
-          : '';
-        const dialogue = panel.dialogue
-          ? `<div class="comic-dialogue">${escapeHtml(panel.dialogue)}</div>`
-          : '';
-        return `<figure class="comic-panel">
-          <img src="${panel.url}" alt="Comic panel" loading="lazy" />
-          ${caption}${dialogue}
-        </figure>`;
-      }).join('');
     }
 
     function setupEmbedFullscreen() {

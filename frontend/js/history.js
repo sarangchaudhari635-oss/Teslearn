@@ -49,18 +49,19 @@ async function loadHistory() {
   ]);
 
   const items = [];
-  videos.forEach((r) => items.push({ type: 'video', topic: r.topic, id: r.id, result: toResult('video', r) }));
-  podcasts.forEach((r) => items.push({ type: 'podcast', topic: r.topic, id: r.id, result: toResult('podcast', r) }));
-  mindmaps.forEach((r) => items.push({ type: 'mindmap', topic: r.topic, id: r.id, result: toResult('mindmap', r) }));
-  notes.forEach((r) => items.push({ type: 'notes', topic: r.topic, id: r.id, result: toResult('notes', r) }));
-  labs.forEach((r) => items.push({ type: 'lab', topic: r.topic, id: r.id, result: toResult('lab', r) }));
+  videos.forEach((r) => items.push({ type: 'video', topic: r.topic, id: r.id, created_at: r.created_at, result: toResult('video', r) }));
+  podcasts.forEach((r) => items.push({ type: 'podcast', topic: r.topic, id: r.id, created_at: r.created_at, result: toResult('podcast', r) }));
+  mindmaps.forEach((r) => items.push({ type: 'mindmap', topic: r.topic, id: r.id, created_at: r.created_at, result: toResult('mindmap', r) }));
+  notes.forEach((r) => items.push({ type: 'notes', topic: r.topic, id: r.id, created_at: r.created_at, result: toResult('notes', r) }));
+  labs.forEach((r) => items.push({ type: 'lab', topic: r.topic, id: r.id, created_at: r.created_at, result: toResult('lab', r) }));
   comics.forEach((r) => items.push({
     type: 'comic',
     topic: r.topic,
     id: r.id,
+    created_at: r.created_at,
     result: toResult('comic', r),
   }));
 
-  items.sort((a, b) => a.topic.localeCompare(b.topic, undefined, { sensitivity: 'base' }));
+  items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   return items;
 }

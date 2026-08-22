@@ -14,7 +14,7 @@ Rules for every panel image_prompt:
 - No text, letters, speech bubbles, captions, watermarks, logos, or UI in the image
 - Square comic panel framing, high detail, kid-safe
 - Keep each prompt under 70 words
-- Preserve panel order: page 1 panel 1, page 1 panel 2, page 2 panel 1, page 2 panel 2
+- Preserve panel order: page 1 panel 1, page 2 panel 1
 
 Schema:
 {{
@@ -28,22 +28,8 @@ Schema:
       "overlay_dialogue": "dialogue to draw in HTML (may be empty)"
     }},
     {{
-      "page": 1,
-      "panel": 2,
-      "image_prompt": "...",
-      "overlay_caption": "...",
-      "overlay_dialogue": "..."
-    }},
-    {{
       "page": 2,
       "panel": 1,
-      "image_prompt": "...",
-      "overlay_caption": "...",
-      "overlay_dialogue": "..."
-    }},
-    {{
-      "page": 2,
-      "panel": 2,
       "image_prompt": "...",
       "overlay_caption": "...",
       "overlay_dialogue": "..."

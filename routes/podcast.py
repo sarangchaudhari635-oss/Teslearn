@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -20,6 +21,7 @@ class PodcastResponse(BaseModel):
     id: str
     topic: str
     audio_url: str
+    created_at: datetime | None = None
 
 
 @router.post("", response_model=PodcastResponse)
@@ -35,11 +37,13 @@ def create_podcast(body: PodcastRequest, session: Session = Depends(get_session)
     )
     session.add(row)
     session.commit()
+    session.refresh(row)
 
     return PodcastResponse(
         id=podcast_id,
         topic=body.topic,
         audio_url=f"{settings.base_url}/podcasts/{podcast_id}/episode.mp3",
+        created_at=row.created_at,
     )
 
 
@@ -51,6 +55,7 @@ def list_podcasts(session: Session = Depends(get_session)):
             id=r.id,
             topic=r.topic,
             audio_url=f"{settings.base_url}/podcasts/{r.filename}",
+            created_at=r.created_at,
         )
         for r in rows
     ]
@@ -65,4 +70,5 @@ def get_podcast(podcast_id: str, session: Session = Depends(get_session)):
         id=row.id,
         topic=row.topic,
         audio_url=f"{settings.base_url}/podcasts/{row.filename}",
+        created_at=row.created_at,
     )

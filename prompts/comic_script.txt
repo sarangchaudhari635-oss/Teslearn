@@ -6,7 +6,7 @@ Write a 2-page educational comic book script for this concept.
 
 Constraints:
 - Exactly 2 pages
-- Exactly 2 panels per page (4 panels total)
+- Exactly 1 panel per page (2 panels total)
 - Kid/teen friendly, clear visual storytelling
 - Each panel needs: scene action, short caption OR speech bubble text (not both long), and a visual focus
 - Keep speech/caption under 12 words
@@ -30,13 +30,6 @@ Schema:
           "caption": "optional narrator line or empty string",
           "dialogue": "Speaker: short line or empty string",
           "focus": "main visual object/action"
-        }},
-        {{
-          "panel": 2,
-          "scene": "...",
-          "caption": "...",
-          "dialogue": "...",
-          "focus": "..."
         }}
       ]
     }},
@@ -45,13 +38,6 @@ Schema:
       "panels": [
         {{
           "panel": 1,
-          "scene": "...",
-          "caption": "...",
-          "dialogue": "...",
-          "focus": "..."
-        }},
-        {{
-          "panel": 2,
           "scene": "...",
           "caption": "...",
           "dialogue": "...",

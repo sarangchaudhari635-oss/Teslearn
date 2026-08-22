@@ -1,11 +1,13 @@
 /** Simulated ETA countdown while resources generate. */
+const ETA_MAX = 60;
+
 const ETA = {
   video: 90,
   podcast: 120,
   mindmap: 45,
   notes: 60,
   lab: 90,
-  comic: 180,
+  comic: 60,
   viva: 8,
   screenReader: 8,
   chat: 5,
@@ -23,7 +25,7 @@ function startSimulatedEta(kind) {
   const fillEl = document.getElementById('etaFill');
   if (!etaEl) return () => {};
 
-  const total = ETA[kind] ?? 60;
+  const total = Math.min(ETA[kind] ?? ETA_MAX, ETA_MAX);
   let elapsed = 0;
 
   etaEl.classList.remove('hidden');

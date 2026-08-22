@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
@@ -18,6 +20,7 @@ class MindmapResponse(BaseModel):
     id: str
     topic: str
     html_url: str
+    created_at: datetime | None = None
 
 
 @router.post("", response_model=MindmapResponse)
@@ -29,11 +32,13 @@ def create_mindmap(body: MindmapRequest, session: Session = Depends(get_session)
     row = Mindmap(id=mindmap_id, topic=body.topic, filename=path.name)
     session.add(row)
     session.commit()
+    session.refresh(row)
 
     return MindmapResponse(
         id=mindmap_id,
         topic=body.topic,
         html_url=f"{settings.base_url}/mindmaps/{path.name}",
+        created_at=row.created_at,
     )
 
 
@@ -45,6 +50,7 @@ def list_mindmaps(session: Session = Depends(get_session)):
             id=r.id,
             topic=r.topic,
             html_url=f"{settings.base_url}/mindmaps/{r.filename}",
+            created_at=r.created_at,
         )
         for r in rows
     ]
@@ -59,4 +65,5 @@ def get_mindmap(mindmap_id: str, session: Session = Depends(get_session)):
         id=row.id,
         topic=row.topic,
         html_url=f"{settings.base_url}/mindmaps/{row.filename}",
+        created_at=row.created_at,
     )
