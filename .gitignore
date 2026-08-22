@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+app.db
+clips/
+podcasts/
+mindmaps/
+comics/
+notes/
+labs/
+.python-version

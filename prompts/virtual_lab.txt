@@ -1,0 +1,23 @@
+Return ONE complete HTML file only.
+No markdown fences. No explanation. No prose before or after the HTML.
+
+TOPIC: {topic}
+
+Build an interactive educational 3D Virtual Lab for this topic.
+
+Hard requirements:
+1. Full document: <!DOCTYPE html> … </html>
+2. Use Tailwind via https://cdn.tailwindcss.com (same dark theme tokens as EXAMPLE: board, panel, card, border, muted, accent, sky, water, leaf)
+3. Google fonts: Plus Jakarta Sans + JetBrains Mono
+4. Three.js from CDN: https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js (global THREE)
+5. Layout: controls on the LEFT, Three.js canvas viewport on the RIGHT (stack on mobile)
+6. Only 1–2 interactive parameters (sliders). Keep it extremely simple.
+7. Clear visible feedback after Run: status banner (ok / warn / bad) + one tip line + one output meter
+8. 3D scene uses simple primitives only (box/sphere/cylinder/cone/torus/octahedron) — no external models/textures
+9. CRAZY continuous animation: orbiting camera, spinning lights/rays, swaying main object, ambient floaters, pulsing glow. On Run: big particle burst + shockwave rings + camera shake scaled by output strength
+10. Must work when opened directly in a browser (no build step)
+11. Educational: teach one core idea of the TOPIC
+12. No external APIs. No login. Self-contained HTML/CSS/JS only.
+
+EXAMPLE (match structure, Tailwind theme, left controls / right Three.js viewport, wild animations, 2 knobs max — invent a NEW 3D lab for TOPIC, do not copy photosynthesis content):
+{example}
