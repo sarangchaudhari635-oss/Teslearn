@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#3b82f6" />
+  <title>Live Session — TesLearn</title>
+  <link rel="icon" href="logo.png" type="image/png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="mesh-bg" aria-hidden="true"></div>
+
+  <div class="shell content">
+    <div id="nav"></div>
+
+    <header class="page-head">
+      <p class="kicker" id="kicker">Live</p>
+      <h1 class="title-lg" id="title">Topic</h1>
+      <p class="muted" id="modeHint">Voice session via Gemini Live API</p>
+    </header>
+
+    <div class="card live-panel">
+      <div class="live-main">
+        <span class="status-pill" id="status">Connect session to begin</span>
+
+        <video id="cam" class="live-preview hidden" autoplay playsinline muted></video>
+
+        <div class="subtitle" id="sub">
+          <span class="muted">AI responses appear here as text subtitles.</span>
+        </div>
+
+        <div class="viz" id="viz" aria-hidden="true">
+          <span class="viz-bar"></span><span class="viz-bar"></span><span class="viz-bar"></span>
+          <span class="viz-bar"></span><span class="viz-bar"></span><span class="viz-bar"></span>
+          <span class="viz-bar"></span><span class="viz-bar"></span><span class="viz-bar"></span>
+          <span class="viz-bar"></span><span class="viz-bar"></span><span class="viz-bar"></span>
+        </div>
+
+        <p id="err" class="alert hidden"></p>
+      </div>
+
+      <div class="live-controls hidden" id="vivaControls">
+        <button type="button" class="btn btn-ghost" id="sessionBtn" style="width:100%;margin-bottom:0.75rem">
+          Connect session
+        </button>
+        <div class="mic-wrap">
+          <span class="mic-ring" id="micRing"></span>
+          <button type="button" class="mic-btn record-btn" id="recordBtn" disabled aria-label="Record answer">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </button>
+        </div>
+        <p class="muted hint" id="hint">Connect first, then record each answer manually</p>
+      </div>
+
+      <div class="live-controls" id="screenControls">
+        <div class="mic-wrap">
+          <span class="mic-ring" id="micRingScreen"></span>
+          <button type="button" class="mic-btn" id="mic" aria-label="Toggle mic">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </button>
+        </div>
+        <p class="muted hint" id="hintScreen">Tap to start live session</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/ui.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/live.js"></script>
+  <script>
+    UI.mountNav({ backHref: 'resources.html' });
+    const mode = new URLSearchParams(location.search).get('mode') || 'viva';
+    document.getElementById('modeHint').textContent =
+      mode === 'screen'
+        ? 'Share your screen — AI reads and explains what you show'
+        : 'Tap Record answer for each response — only that chunk is sent';
+  </script>
+</body>
+</html>

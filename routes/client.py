@@ -12,7 +12,11 @@ def client_info():
         "modes": ["camera", "screen", "viva"],
         "send": [
             {"type": "image", "mime_type": "image/jpeg", "data": "<base64 jpeg>"},
-            {"type": "audio", "mime_type": "audio/pcm", "data": "<base64 pcm 16khz mono s16le>"},
+            {
+                "type": "audio",
+                "mime_type": "audio/pcm",
+                "data": "<base64 pcm 16khz mono s16le>",
+            },
         ],
         "recv": [
             {"type": "audio", "mime_type": "audio/pcm;rate=24000", "data": "<base64>"},

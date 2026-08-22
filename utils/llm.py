@@ -9,8 +9,11 @@ from litellm import completion, image_generation
 
 from config import settings
 from prompts import (
+    build_chat_guardrail_prompt,
+    build_chat_system_prompt,
     build_comic_image_prompt_maker,
     build_comic_script_prompt,
+    build_guardrail_prompt,
     build_mindmap_prompt,
     build_notes_prompt,
     build_podcast_prompt,
@@ -59,6 +62,59 @@ def _chat(prompt: str, temperature: float = 0.4, *, json_mode: bool = False):
 def _chat_json(prompt: str, temperature: float = 0.4) -> dict:
     resp = _chat(prompt, temperature=temperature, json_mode=True)
     return json.loads(_strip_fences(resp.choices[0].message.content or ""))
+
+
+def check_prompt_guardrail(prompt: str) -> dict:
+    data = _chat_json(build_guardrail_prompt(prompt), temperature=0.1)
+    allowed = bool(data.get("allowed", False))
+    status = "success" if allowed else "error"
+    if data.get("status") in ("success", "error"):
+        status = data["status"]
+    return {
+        "status": status,
+        "allowed": allowed,
+        "reason": str(data.get("reason", "No reason provided")),
+    }
+
+
+def check_chat_message_guardrail(message: str) -> dict:
+    """Lighter guardrail for in-session chat (allows hey, thanks, follow-ups)."""
+    data = _chat_json(build_chat_guardrail_prompt(message), temperature=0.1)
+    allowed = bool(data.get("allowed", False))
+    status = "success" if allowed else "error"
+    if data.get("status") in ("success", "error"):
+        status = data["status"]
+    return {
+        "status": status,
+        "allowed": allowed,
+        "reason": str(data.get("reason", "No reason provided")),
+    }
+
+
+def chat_reply(topic: str, messages: list[dict]) -> str:
+    """Multi-turn chat with system prompt scoped to topic."""
+    system = build_chat_system_prompt(topic)
+    llm_messages = [{"role": "system", "content": system}]
+    for msg in messages:
+        role = (msg.get("role") or "user").strip().lower()
+        content = (msg.get("content") or "").strip()
+        if not content or role not in ("user", "assistant"):
+            continue
+        llm_messages.append({"role": role, "content": content})
+    if not any(m["role"] == "user" for m in llm_messages):
+        raise ValueError("messages must include at least one user turn")
+
+    resp = completion(
+        model=_studio_model(settings.llm_model),
+        messages=llm_messages,
+        temperature=0.45,
+        api_key=_api_key(),
+        custom_llm_provider="gemini",
+    )
+    reply = (resp.choices[0].message.content or "").strip()
+    if not reply:
+        raise ValueError("empty chat reply from model")
+    return reply
 
 
 def generate_html(topic: str, duration: int = 12) -> str:

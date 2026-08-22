@@ -88,10 +88,22 @@ async def run_client_session(ws: WebSocket, mode: str) -> None:
                 blob = data.get("data")
                 if kind in ("audio",) or mime.startswith("audio/"):
                     await session.send_realtime_input(
-                        audio={"data": _b64_to_bytes(blob), "mime_type": mime or "audio/pcm"}
+                        audio={
+                            "data": _b64_to_bytes(blob),
+                            "mime_type": mime or "audio/pcm",
+                        }
                     )
+                elif kind == "activity_start":
+                    await session.send_realtime_input(
+                        activity_start=types.ActivityStart()
+                    )
+                elif kind in ("activity_end", "turn_complete"):
+                    await session.send_realtime_input(activity_end=types.ActivityEnd())
+                    await session.send_realtime_input(audio_stream_end=True)
                 elif mode != "viva" and (
-                    kind in ("image", "video", "frame") or mime.startswith("image/") or mime.startswith("video/")
+                    kind in ("image", "video", "frame")
+                    or mime.startswith("image/")
+                    or mime.startswith("video/")
                 ):
                     await session.send_realtime_input(
                         video={"data": blob, "mime_type": mime or "image/jpeg"}

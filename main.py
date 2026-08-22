@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from config import CLIPS_DIR, COMICS_DIR, LABS_DIR, MINDMAPS_DIR, NOTES_DIR, PODCASTS_DIR
+from routes.chat import router as chat_router
+from routes.guardrail import router as guardrail_router
 from routes.client import router as client_router
 from routes.comic import router as comic_router
 from routes.lab import router as lab_router
@@ -23,6 +25,8 @@ app.add_middleware(
 )
 
 init_db()
+app.include_router(guardrail_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 app.include_router(video_router, prefix="/api")
 app.include_router(podcast_router, prefix="/api")
 app.include_router(mindmap_router, prefix="/api")

@@ -59,3 +59,15 @@ def build_notes_diagram_prompt(topic: str) -> str:
 def build_virtual_lab_prompt(topic: str) -> str:
     example = (ROOT / "virtual_lab.html").read_text(encoding="utf-8")
     return load_prompt("virtual_lab", topic=topic, example=example)
+
+
+def build_guardrail_prompt(prompt: str) -> str:
+    return load_prompt("guardrail", prompt=prompt)
+
+
+def build_chat_guardrail_prompt(message: str) -> str:
+    return load_prompt("chat_guardrail", prompt=message)
+
+
+def build_chat_system_prompt(topic: str) -> str:
+    return load_prompt("chat", topic=topic)
