@@ -60,6 +60,8 @@
   const micRing = document.getElementById(isViva ? 'micRing' : 'micRingScreen');
   const vivaControls = document.getElementById('vivaControls');
   const screenControls = document.getElementById('screenControls');
+  const liveStage = document.getElementById('liveStage');
+  const liveFsBtn = document.getElementById('liveFsBtn');
 
   if (isViva) {
     vivaControls?.classList.remove('hidden');
@@ -71,6 +73,7 @@
 
   let ws = null;
   let sessionConnected = false;
+  let connecting = false;
   let recording = false;
   let mediaStream = null;
   let audioCtx = null;
@@ -86,22 +89,30 @@
   }
 
   function setVivaUi() {
-    if (!isViva) return;
-    sessionBtn.disabled = sessionConnected;
-    sessionBtn.textContent = sessionConnected ? 'Connected' : 'Connect session';
-    recordBtn.disabled = !sessionConnected;
+    if (!isViva || !recordBtn) return;
+
+    sessionBtn.classList.toggle('hidden', sessionConnected || connecting);
+    sessionBtn.disabled = connecting;
+    sessionBtn.textContent = connecting ? 'Connecting…' : 'Reconnect';
+
+    recordBtn.disabled = !sessionConnected || connecting;
     recordBtn.textContent = recording ? 'Stop & send' : 'Record answer';
     recordBtn.classList.toggle('on', recording);
+    recordBtn.setAttribute('aria-label', recording ? 'Stop and send answer' : 'Record answer');
     micRing?.classList.toggle('live', recording);
 
-    if (!sessionConnected) {
-      statusEl.textContent = 'Connect to start viva';
+    if (connecting) {
+      statusEl.textContent = 'Connecting…';
       statusEl.classList.remove('on');
-      hintEl.textContent = 'Connect first, then record each answer manually';
+      hintEl.textContent = 'Setting up mic and AI session';
+    } else if (!sessionConnected) {
+      statusEl.textContent = 'Not connected';
+      statusEl.classList.remove('on');
+      hintEl.textContent = 'Tap Reconnect if the session did not start';
     } else if (recording) {
       statusEl.textContent = 'Recording your answer…';
       statusEl.classList.add('on');
-      hintEl.textContent = 'Tap Stop when you finish speaking';
+      hintEl.textContent = 'Tap Stop & send when you finish speaking';
     } else {
       statusEl.textContent = 'Ready — tap Record answer';
       statusEl.classList.remove('on');
@@ -114,12 +125,16 @@
     statusEl.classList.toggle('on', live);
     micBtn.classList.toggle('on', live);
     micRing?.classList.toggle('live', live);
-    hintEl.textContent = live ? 'Tap to end session' : 'Tap to start live session';
+    hintEl.textContent = live ? 'Tap to end session' : 'Tap mic to share screen and start';
   }
 
   function showErr(msg) {
     errEl.textContent = msg;
     errEl.classList.remove('hidden');
+    if (isViva) {
+      sessionBtn.classList.remove('hidden');
+      sessionBtn.textContent = 'Reconnect';
+    }
   }
 
   function startViz() {
@@ -139,6 +154,28 @@
     if (vizTimer) clearInterval(vizTimer);
     vizTimer = null;
     vizEl?.querySelectorAll('.viz-bar').forEach((b) => { b.style.height = '12%'; });
+  }
+
+  function waitForSocketOpen(socket, timeoutMs = 20000) {
+    return new Promise((resolve, reject) => {
+      if (socket.readyState === WebSocket.OPEN) {
+        resolve();
+        return;
+      }
+      const t = setTimeout(() => {
+        cleanup();
+        reject(new Error('Connection timeout'));
+      }, timeoutMs);
+      const onOpen = () => { cleanup(); resolve(); };
+      const onErr = () => { cleanup(); reject(new Error('WebSocket failed')); };
+      const cleanup = () => {
+        clearTimeout(t);
+        socket.removeEventListener('open', onOpen);
+        socket.removeEventListener('error', onErr);
+      };
+      socket.addEventListener('open', onOpen);
+      socket.addEventListener('error', onErr);
+    });
   }
 
   async function getScreenStream() {
@@ -180,6 +217,7 @@
       if (msg.type === 'status') {
         if (msg.status === 'connected') {
           sessionConnected = true;
+          connecting = false;
           if (isViva) setVivaUi();
           else setScreenStatus('Live — speak now', true);
         } else if (!isViva) {
@@ -196,6 +234,7 @@
     ws.onerror = () => showErr('WebSocket error — is the backend running?');
     ws.onclose = () => {
       sessionConnected = false;
+      connecting = false;
       recording = false;
       if (isViva) setVivaUi();
       else setScreenStatus('Disconnected');
@@ -205,14 +244,11 @@
 
   async function connectSession() {
     errEl.classList.add('hidden');
-    if (sessionConnected) return;
+    if (sessionConnected || connecting) return;
 
-    if (isViva) {
-      statusEl.textContent = 'Connecting…';
-      sessionBtn.disabled = true;
-    } else {
-      setScreenStatus('Connecting…');
-    }
+    connecting = true;
+    if (isViva) setVivaUi();
+    else setScreenStatus('Connecting…');
 
     try {
       await pcmOut.init();
@@ -220,18 +256,16 @@
 
       ws = new WebSocket(wsUrl(mode));
       setupWsHandlers();
-
-      await new Promise((resolve, reject) => {
-        const t = setTimeout(() => reject(new Error('Connection timeout')), 12000);
-        ws.onopen = () => { clearTimeout(t); resolve(); };
-        ws.onerror = () => { clearTimeout(t); reject(new Error('WebSocket failed')); };
-      });
+      await waitForSocketOpen(ws);
 
       startMicPcm();
       if (mode === 'screen' && mediaStream.getVideoTracks().length) startVideoFrames();
     } catch (e) {
+      connecting = false;
       showErr(e.message || String(e));
       endSession(false);
+    } finally {
+      if (isViva) setVivaUi();
     }
   }
 
@@ -282,7 +316,7 @@
   }
 
   function startRecording() {
-    if (!sessionConnected || recording) return;
+    if (!sessionConnected || recording || connecting) return;
     recording = true;
     sendCtrl('activity_start');
     setVivaUi();
@@ -298,6 +332,7 @@
   function teardownAudio(closeWs) {
     stopViz();
     recording = false;
+    connecting = false;
     pcmOut.reset();
     if (frameTimer) clearInterval(frameTimer);
     frameTimer = null;
@@ -330,21 +365,56 @@
   function endSession(userInitiated = true) {
     if (recording) stopRecording();
     teardownAudio(true);
-    if (!isViva && userInitiated) setScreenStatus('Tap mic to start');
+    if (!isViva && userInitiated) setScreenStatus('Tap mic to share screen and start');
   }
+
+  function setupFullscreen() {
+    if (!liveStage || !liveFsBtn) return;
+
+    const isFs = () =>
+      document.fullscreenElement === liveStage ||
+      document.webkitFullscreenElement === liveStage;
+
+    const enter = () => {
+      if (liveStage.requestFullscreen) return liveStage.requestFullscreen();
+      if (liveStage.webkitRequestFullscreen) return liveStage.webkitRequestFullscreen();
+    };
+
+    const exit = () => {
+      if (document.exitFullscreen) return document.exitFullscreen();
+      if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+    };
+
+    const sync = () => {
+      liveFsBtn.textContent = isFs() ? '⛶ Exit fullscreen' : '⛶ Fullscreen';
+      liveFsBtn.setAttribute('aria-label', isFs() ? 'Exit fullscreen' : 'Enter fullscreen');
+    };
+
+    liveFsBtn.addEventListener('click', () => {
+      if (isFs()) exit();
+      else enter();
+    });
+
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+  }
+
+  setupFullscreen();
 
   if (isViva) {
     setVivaUi();
     sessionBtn?.addEventListener('click', () => connectSession());
-    recordBtn?.addEventListener('click', () => {
+    recordBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
       if (recording) stopRecording();
       else startRecording();
     });
+    connectSession();
   } else {
-    micBtn.onclick = () => {
+    micBtn?.addEventListener('click', () => {
       if (sessionConnected) endSession(true);
       else connectSession();
-    };
+    });
   }
 
   window.addEventListener('beforeunload', () => {

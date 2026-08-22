@@ -1,4 +1,4 @@
-/** Interactive comic book viewer with page-turn effect. */
+/** Interactive comic book — open spread (2 pages) with page-turn. */
 const ComicBook = {
   escapeHtml(text) {
     return String(text)
@@ -13,7 +13,18 @@ const ComicBook = {
     return (result.image_urls || []).map((url) => ({ url, caption: '', dialogue: '' }));
   },
 
-  pageHtml(panel, pageNum, total) {
+  toSpreads(panels) {
+    const spreads = [];
+    for (let i = 0; i < panels.length; i += 2) {
+      spreads.push({ left: panels[i], right: panels[i + 1] || null });
+    }
+    return spreads;
+  },
+
+  pageSideHtml(panel, side, pageNum, total) {
+    if (!panel) {
+      return `<div class="comic-page comic-page--${side} comic-page--blank" aria-hidden="true"></div>`;
+    }
     const caption = panel.caption
       ? `<div class="comic-caption">${this.escapeHtml(panel.caption)}</div>`
       : '';
@@ -21,10 +32,23 @@ const ComicBook = {
       ? `<div class="comic-dialogue">${this.escapeHtml(panel.dialogue)}</div>`
       : '';
     return `
-      <div class="comic-page-inner">
-        <img src="${panel.url}" alt="Comic page ${pageNum}" draggable="false" />
-        ${caption}${dialogue}
-        <span class="comic-page-num">${pageNum} / ${total}</span>
+      <div class="comic-page comic-page--${side}">
+        <div class="comic-page-inner">
+          <img src="${panel.url}" alt="Comic page ${pageNum}" draggable="false" loading="lazy" />
+          ${caption}${dialogue}
+          <span class="comic-page-num">${pageNum} / ${total}</span>
+        </div>
+      </div>`;
+  },
+
+  spreadHtml(spread, spreadIndex, spreads, panels) {
+    const leftNum = spreadIndex * 2 + 1;
+    const rightNum = spreadIndex * 2 + 2;
+    return `
+      <div class="comic-spread" data-spread="${spreadIndex}">
+        ${this.pageSideHtml(spread.left, 'left', leftNum, panels.length)}
+        <div class="comic-spread-gutter" aria-hidden="true"></div>
+        ${this.pageSideHtml(spread.right, 'right', rightNum, panels.length)}
       </div>`;
   },
 
@@ -35,27 +59,28 @@ const ComicBook = {
       return;
     }
 
+    const spreads = this.toSpreads(panels);
     const title = this.escapeHtml(result.title || 'Comic');
-    let index = 0;
+    let spreadIndex = 0;
     let busy = false;
 
     container.innerHTML = `
-      <div class="comic-book" id="comicBook">
+      <div class="comic-book" id="comicBook" tabindex="0">
         <div class="comic-book-shell">
           <div class="comic-book-edge" aria-hidden="true"></div>
-          <div class="comic-book-viewport" id="comicViewport">
-            <div class="comic-book-sheet comic-book-sheet--base" id="comicBase"></div>
-            <div class="comic-book-sheet comic-book-sheet--flip" id="comicFlip" aria-hidden="true"></div>
-            <button type="button" class="comic-hit comic-hit--prev" id="comicHitPrev" aria-label="Previous page"></button>
-            <button type="button" class="comic-hit comic-hit--next" id="comicHitNext" aria-label="Next page"></button>
+          <div class="comic-book-viewport comic-book-viewport--spread" id="comicViewport">
+            <div class="comic-book-layer comic-book-layer--base" id="comicBase"></div>
+            <div class="comic-book-layer comic-book-layer--flip is-idle" id="comicFlip" aria-hidden="true"></div>
+            <button type="button" class="comic-hit comic-hit--prev" id="comicHitPrev" aria-label="Previous spread"></button>
+            <button type="button" class="comic-hit comic-hit--next" id="comicHitNext" aria-label="Next spread"></button>
           </div>
           <div class="comic-book-spine" aria-hidden="true"></div>
         </div>
         <p class="comic-book-title">${title}</p>
         <div class="comic-book-toolbar">
-          <button type="button" class="btn btn-ghost" id="comicPrev" aria-label="Previous page">← Prev</button>
-          <span class="comic-book-indicator" id="comicIndicator">1 / ${panels.length}</span>
-          <button type="button" class="btn btn-ghost" id="comicNext" aria-label="Next page">Next →</button>
+          <button type="button" class="btn btn-ghost" id="comicPrev" aria-label="Previous spread">← Prev</button>
+          <span class="comic-book-indicator" id="comicIndicator"></span>
+          <button type="button" class="btn btn-ghost" id="comicNext" aria-label="Next spread">Next →</button>
         </div>
       </div>`;
 
@@ -67,41 +92,58 @@ const ComicBook = {
     const hitPrev = container.querySelector('#comicHitPrev');
     const hitNext = container.querySelector('#comicHitNext');
 
-    const renderBase = (i) => {
-      base.innerHTML = this.pageHtml(panels[i], i + 1, panels.length);
+    const renderSpread = (el, idx) => {
+      el.innerHTML = this.spreadHtml(spreads[idx], idx, spreads, panels);
+    };
+
+    const labelFor = (idx) => {
+      if (spreads.length <= 1) return `${panels.length} page${panels.length === 1 ? '' : 's'}`;
+      const start = idx * 2 + 1;
+      const end = Math.min((idx + 1) * 2, panels.length);
+      return `Pages ${start}–${end} · ${idx + 1} / ${spreads.length}`;
     };
 
     const syncControls = () => {
-      indicator.textContent = `${index + 1} / ${panels.length}`;
-      prevBtn.disabled = index === 0 || busy;
-      nextBtn.disabled = index >= panels.length - 1 || busy;
-      hitPrev.disabled = index === 0 || busy;
-      hitNext.disabled = index >= panels.length - 1 || busy;
+      indicator.textContent = labelFor(spreadIndex);
+      const atStart = spreadIndex === 0;
+      const atEnd = spreadIndex >= spreads.length - 1;
+      prevBtn.disabled = atStart || busy;
+      nextBtn.disabled = atEnd || busy;
+      hitPrev.disabled = atStart || busy;
+      hitNext.disabled = atEnd || busy;
+    };
+
+    const hideFlip = () => {
+      flip.className = 'comic-book-layer comic-book-layer--flip is-idle';
+      flip.innerHTML = '';
+      flip.setAttribute('aria-hidden', 'true');
+    };
+
+    const showFlip = (className, html) => {
+      flip.innerHTML = html;
+      flip.className = `comic-book-layer comic-book-layer--flip ${className}`;
+      flip.removeAttribute('aria-hidden');
     };
 
     const finishFlip = (nextIndex) => {
-      index = nextIndex;
-      renderBase(index);
-      flip.className = 'comic-book-sheet comic-book-sheet--flip';
-      flip.innerHTML = '';
-      flip.setAttribute('aria-hidden', 'true');
+      spreadIndex = nextIndex;
+      renderSpread(base, spreadIndex);
+      hideFlip();
       busy = false;
       syncControls();
     };
 
     const turnForward = () => {
-      if (busy || index >= panels.length - 1) return;
+      if (busy || spreadIndex >= spreads.length - 1) return;
       busy = true;
       syncControls();
 
-      const nextIndex = index + 1;
-      base.innerHTML = this.pageHtml(panels[nextIndex], nextIndex + 1, panels.length);
-      flip.innerHTML = this.pageHtml(panels[index], index + 1, panels.length);
-      flip.className = 'comic-book-sheet comic-book-sheet--flip is-turning-forward';
-      flip.removeAttribute('aria-hidden');
+      const nextIndex = spreadIndex + 1;
+      renderSpread(base, nextIndex);
+      showFlip('is-turning-forward', this.spreadHtml(spreads[spreadIndex], spreadIndex, spreads, panels));
 
       const onEnd = (e) => {
-        if (e.propertyName !== 'transform') return;
+        if (e.target !== flip || e.propertyName !== 'transform') return;
         flip.removeEventListener('transitionend', onEnd);
         finishFlip(nextIndex);
       };
@@ -109,23 +151,24 @@ const ComicBook = {
     };
 
     const turnBackward = () => {
-      if (busy || index <= 0) return;
+      if (busy || spreadIndex <= 0) return;
       busy = true;
       syncControls();
 
-      const prevIndex = index - 1;
-      flip.innerHTML = this.pageHtml(panels[prevIndex], prevIndex + 1, panels.length);
-      flip.className = 'comic-book-sheet comic-book-sheet--flip is-turning-backward-start';
-      flip.removeAttribute('aria-hidden');
+      const prevIndex = spreadIndex - 1;
+      showFlip(
+        'is-turning-backward-start',
+        this.spreadHtml(spreads[prevIndex], prevIndex, spreads, panels),
+      );
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          flip.className = 'comic-book-sheet comic-book-sheet--flip is-turning-backward';
+          flip.className = 'comic-book-layer comic-book-layer--flip is-turning-backward';
         });
       });
 
       const onEnd = (e) => {
-        if (e.propertyName !== 'transform') return;
+        if (e.target !== flip || e.propertyName !== 'transform') return;
         flip.removeEventListener('transitionend', onEnd);
         finishFlip(prevIndex);
       };
@@ -137,9 +180,7 @@ const ComicBook = {
     hitPrev.addEventListener('click', turnBackward);
     hitNext.addEventListener('click', turnForward);
 
-    container.querySelector('.comic-book')?.setAttribute('tabindex', '0');
-
-    container.addEventListener('keydown', (e) => {
+    container.querySelector('#comicBook')?.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowLeft') turnBackward();
       if (e.key === 'ArrowRight') turnForward();
     });
@@ -156,7 +197,8 @@ const ComicBook = {
       touchX = null;
     }, { passive: true });
 
-    renderBase(index);
+    renderSpread(base, spreadIndex);
+    hideFlip();
     syncControls();
   },
 };

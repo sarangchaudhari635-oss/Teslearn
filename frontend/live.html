@@ -21,7 +21,9 @@
       <p class="muted" id="modeHint">Voice session via Gemini Live API</p>
     </header>
 
-    <div class="card live-panel">
+    <div class="live-stage card live-panel" id="liveStage">
+      <button type="button" class="embed-fs-btn" id="liveFsBtn" aria-label="Enter fullscreen">⛶ Fullscreen</button>
+
       <div class="live-main">
         <span class="status-pill" id="status">Connect session to begin</span>
 
@@ -42,21 +44,22 @@
       </div>
 
       <div class="live-controls hidden" id="vivaControls">
-        <button type="button" class="btn btn-ghost" id="sessionBtn" style="width:100%;margin-bottom:0.75rem">
-          Connect session
-        </button>
-        <div class="mic-wrap">
+        <div class="mic-wrap" aria-hidden="true">
           <span class="mic-ring" id="micRing"></span>
-          <button type="button" class="mic-btn record-btn" id="recordBtn" disabled aria-label="Record answer">
+          <div class="mic-btn mic-btn--viz">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
               <line x1="12" y1="19" x2="12" y2="23"/>
               <line x1="8" y1="23" x2="16" y2="23"/>
             </svg>
-          </button>
+          </div>
         </div>
-        <p class="muted hint" id="hint">Connect first, then record each answer manually</p>
+        <button type="button" class="btn btn-primary live-action-btn" id="recordBtn" disabled>
+          Record answer
+        </button>
+        <button type="button" class="btn btn-ghost hidden" id="sessionBtn">Reconnect</button>
+        <p class="muted hint" id="hint">Connecting session…</p>
       </div>
 
       <div class="live-controls" id="screenControls">
@@ -71,7 +74,7 @@
             </svg>
           </button>
         </div>
-        <p class="muted hint" id="hintScreen">Tap to start live session</p>
+        <p class="muted hint" id="hintScreen">Tap mic to share screen and start</p>
       </div>
     </div>
   </div>

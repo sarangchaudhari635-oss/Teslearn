@@ -293,6 +293,36 @@ body {
 .result-frame iframe { width: 100%; height: min(70vh, 520px); border: 0; }
 .result-frame audio { width: calc(100% - 2rem); margin: 1.5rem 1rem; }
 
+.podcast-result {
+  padding: 0;
+  overflow: hidden;
+  background: var(--card);
+  min-height: 0;
+}
+
+.podcast-player {
+  display: flex;
+  flex-direction: column;
+}
+
+.podcast-thumb {
+  width: 100%;
+  height: auto;
+  display: block;
+  vertical-align: top;
+}
+
+.podcast-audio-wrap {
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.podcast-audio-wrap audio {
+  width: 100%;
+  margin: 0;
+  display: block;
+}
+
 .video-player, .embed-player { position: relative; border-radius: var(--radius); overflow: hidden; }
 .video-player { background: #000; }
 .embed-player { background: var(--muted); }
@@ -345,7 +375,7 @@ body {
 
 .comic-book-shell {
   position: relative;
-  width: min(100%, 380px);
+  width: min(100%, 720px);
   padding: 0.65rem 0.85rem 0.65rem 1.1rem;
   border-radius: 6px 14px 14px 6px;
   background: linear-gradient(135deg, #8b5e3c 0%, #6b4428 45%, #4a2f1a 100%);
@@ -379,8 +409,8 @@ body {
 .comic-book-viewport {
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
-  perspective: 1600px;
+  aspect-ratio: 3 / 2;
+  perspective: 2000px;
   border-radius: 2px 8px 8px 2px;
   overflow: hidden;
   background: #f7f2e8;
@@ -389,36 +419,70 @@ body {
     inset 8px 0 16px color-mix(in srgb, #000 6%, transparent);
 }
 
-.comic-book-sheet {
+.comic-book-viewport--spread { aspect-ratio: 16 / 10; }
+
+.comic-book-layer {
   position: absolute;
   inset: 0;
   background: #fffef9;
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
 }
 
-.comic-book-sheet--base { z-index: 1; }
+.comic-book-layer--base { z-index: 1; }
 
-.comic-book-sheet--flip {
+.comic-book-layer--flip {
   z-index: 3;
   transform-origin: left center;
   transform: rotateY(0deg);
   transition: transform 0.75s cubic-bezier(0.45, 0.05, 0.25, 1);
   box-shadow: 4px 0 18px color-mix(in srgb, #000 18%, transparent);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
 
-.comic-book-sheet--flip.is-turning-forward {
+.comic-book-layer--flip.is-idle {
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 0;
+  transition: none;
+  box-shadow: none;
+}
+
+.comic-book-layer--flip.is-turning-forward {
   transform: rotateY(-180deg);
 }
 
-.comic-book-sheet--flip.is-turning-backward-start {
+.comic-book-layer--flip.is-turning-backward-start {
   transform: rotateY(-180deg);
   transition: none;
 }
 
-.comic-book-sheet--flip.is-turning-backward {
+.comic-book-layer--flip.is-turning-backward {
   transform: rotateY(0deg);
   transition: transform 0.75s cubic-bezier(0.45, 0.05, 0.25, 1);
+}
+
+.comic-spread {
+  display: grid;
+  grid-template-columns: 1fr 3px 1fr;
+  width: 100%;
+  height: 100%;
+  background: #fffef9;
+}
+
+.comic-spread-gutter {
+  background: linear-gradient(90deg, color-mix(in srgb, #000 10%, transparent), color-mix(in srgb, #000 4%, transparent), color-mix(in srgb, #000 10%, transparent));
+  box-shadow: inset 0 0 8px color-mix(in srgb, #000 12%, transparent);
+}
+
+.comic-page {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  background: #fffef9;
+}
+
+.comic-page--blank {
+  background: linear-gradient(135deg, #fffef9, #f3ead8);
 }
 
 .comic-page-inner {
@@ -431,8 +495,9 @@ body {
 .comic-page-inner img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
+  background: #fffef9;
 }
 
 .comic-page-num {
@@ -476,7 +541,7 @@ body {
   justify-content: center;
   gap: 0.75rem;
   width: 100%;
-  max-width: 380px;
+  max-width: 720px;
 }
 
 .comic-book-indicator {
@@ -561,6 +626,29 @@ body {
 
 .live-panel { display: grid; gap: 1.5rem; padding: 1.5rem; }
 @media (min-width: 900px) { .live-panel { grid-template-columns: 1.2fr 0.8fr; align-items: center; } }
+
+.live-stage { position: relative; }
+.live-stage:fullscreen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-height: 100vh;
+  overflow: auto;
+  border-radius: 0;
+}
+.live-stage:fullscreen .live-panel { flex: 1; width: 100%; max-width: none; }
+
+.live-action-btn {
+  width: 100%;
+  min-height: 2.85rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.live-action-btn.on { background: var(--destructive); border-color: var(--destructive); }
+.live-action-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.mic-btn--viz { pointer-events: none; cursor: default; }
+
 .live-preview { width: 100%; max-height: 280px; border-radius: var(--radius); background: var(--muted); object-fit: contain; }
 .subtitle { min-height: 5rem; margin-top: 1rem; padding: 1rem; border-radius: var(--radius); background: var(--muted); font-size: 0.9375rem; }
 .viz { display: flex; align-items: flex-end; justify-content: center; gap: 4px; height: 3rem; margin-top: 1rem; }

@@ -58,7 +58,14 @@
         break;
       case 'podcast':
         kicker.textContent = 'Podcast';
-        box.innerHTML = `<audio controls src="${r.audio_url}"></audio>`;
+        box.className = 'card result-frame podcast-result';
+        box.innerHTML = `
+          <div class="podcast-player">
+            <img src="podcast_result.png" alt="" class="podcast-thumb" />
+            <div class="podcast-audio-wrap">
+              <audio controls src="${r.audio_url}"></audio>
+            </div>
+          </div>`;
         break;
       case 'mindmap':
         kicker.textContent = 'Mindmap';

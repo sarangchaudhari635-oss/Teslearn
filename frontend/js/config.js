@@ -1,4 +1,4 @@
-const API_BASE = localStorage.getItem('teslearn_api') || 'http://127.0.0.1:8000';
+const API_BASE = localStorage.getItem('teslearn_api') || 'https://turkey-glad-collie.ngrok-free.app';
 
 function wsUrl(mode) {
   const base = API_BASE.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
