@@ -21,15 +21,10 @@ async function checkGuardrail(prompt) {
   return { allowed: !!data.allowed, reason: data.reason || 'Blocked' };
 }
 
-async function checkLiveBackend(mode) {
-  const res = await fetch(`${API_BASE}/api/client/info`, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`Live API unavailable (${res.status})`);
-  const info = await res.json();
-  const wsMode = mode === 'screenReader' ? 'screen' : 'viva';
-  if (!info.modes?.includes(wsMode)) {
-    throw new Error(`Mode "${wsMode}" not supported by server`);
-  }
-  return info;
+async function checkLiveBackend() {
+  const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error('Backend unavailable');
+  return res.json();
 }
 
 async function loadResource(kind, topic) {
@@ -79,12 +74,12 @@ async function loadResource(kind, topic) {
       };
     }
     case 'viva': {
-      await checkLiveBackend('viva');
-      return { type: 'viva', title: topic, wsMode: 'viva' };
+      await checkLiveBackend();
+      return { type: 'viva', title: topic, liveMode: 'viva' };
     }
     case 'screenReader': {
-      await checkLiveBackend('screenReader');
-      return { type: 'screenReader', title: topic, wsMode: 'screen' };
+      await checkLiveBackend();
+      return { type: 'screenReader', title: topic, liveMode: 'screen' };
     }
     case 'chat':
       return { type: 'chat', title: topic };

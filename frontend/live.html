@@ -12,7 +12,7 @@
 <body>
   <div class="mesh-bg" aria-hidden="true"></div>
 
-  <div class="shell content">
+  <div class="shell shell-narrow content">
     <div id="nav"></div>
 
     <header class="page-head">
@@ -21,16 +21,14 @@
       <p class="muted" id="modeHint">Voice session via Gemini Live API</p>
     </header>
 
-    <div class="live-stage card live-panel" id="liveStage">
+    <div class="live-stage card" id="liveStage">
       <button type="button" class="embed-fs-btn" id="liveFsBtn" aria-label="Enter fullscreen">⛶ Fullscreen</button>
 
-      <div class="live-main">
-        <span class="status-pill" id="status">Connect session to begin</span>
+      <div class="live-viva" id="vivaPanel">
+        <span class="status-pill" id="status">Starting…</span>
 
-        <video id="cam" class="live-preview hidden" autoplay playsinline muted></video>
-
-        <div class="subtitle" id="sub">
-          <span class="muted">AI responses appear here as text subtitles.</span>
+        <div class="live-subtitle-box" id="sub">
+          <p class="muted">Examiner questions and AI replies appear here.</p>
         </div>
 
         <div class="viz" id="viz" aria-hidden="true">
@@ -41,41 +39,24 @@
         </div>
 
         <p id="err" class="alert hidden"></p>
+        <p class="muted hint live-hint" id="hint">Starting session on the server…</p>
       </div>
 
-      <div class="live-controls hidden" id="vivaControls">
-        <div class="mic-wrap" aria-hidden="true">
-          <span class="mic-ring" id="micRing"></span>
-          <div class="mic-btn mic-btn--viz">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-          </div>
+      <div class="live-screen hidden" id="screenPanel">
+        <span class="status-pill" id="statusScreen">Starting…</span>
+        <video id="cam" class="live-preview hidden" autoplay playsinline muted></video>
+        <div class="live-subtitle-box" id="subScreen">
+          <p class="muted">AI responses appear here as text subtitles.</p>
         </div>
-        <button type="button" class="btn btn-primary live-action-btn" id="recordBtn" disabled>
-          Record answer
-        </button>
-        <button type="button" class="btn btn-ghost hidden" id="sessionBtn">Reconnect</button>
-        <p class="muted hint" id="hint">Connecting session…</p>
+        <div class="viz" id="vizScreen" aria-hidden="true">
+          <span class="viz-bar"></span><span class="viz-bar"></span><span class="viz-bar"></span>
+          <span class="viz-bar"></span><span class="viz-bar"></span><span class="viz-bar"></span>
+        </div>
+        <p id="errScreen" class="alert hidden"></p>
+        <p class="muted hint live-hint" id="hintScreen">Starting session on the server…</p>
       </div>
 
-      <div class="live-controls" id="screenControls">
-        <div class="mic-wrap">
-          <span class="mic-ring" id="micRingScreen"></span>
-          <button type="button" class="mic-btn" id="mic" aria-label="Toggle mic">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-          </button>
-        </div>
-        <p class="muted hint" id="hintScreen">Tap mic to share screen and start</p>
-      </div>
+      <button type="button" class="btn btn-ghost live-action-btn hidden" id="sessionBtn">Reconnect</button>
     </div>
   </div>
 
@@ -88,8 +69,8 @@
     const mode = new URLSearchParams(location.search).get('mode') || 'viva';
     document.getElementById('modeHint').textContent =
       mode === 'screen'
-        ? 'Share your screen — AI reads and explains what you show'
-        : 'Tap Record answer for each response — only that chunk is sent';
+        ? 'Opens a live session — talk naturally, the AI sees your screen and replies'
+        : 'Opens a live viva — talk naturally, the examiner listens and replies';
   </script>
 </body>
 </html>

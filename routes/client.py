@@ -27,13 +27,14 @@ def client_info():
 
 
 @router.websocket("/ws")
-async def client_ws(ws: WebSocket, mode: str = "camera"):
+async def client_ws(ws: WebSocket, mode: str = "camera", topic: str = ""):
     if mode not in ("camera", "screen", "viva"):
         await ws.close(code=4400)
         return
     await ws.accept()
+    await ws.send_json({"type": "status", "status": "linking", "mode": mode})
     try:
-        await run_client_session(ws, mode)
+        await run_client_session(ws, mode, topic=topic.strip())
     except WebSocketDisconnect:
         pass
     except Exception as exc:

@@ -1,45 +1,6 @@
 (() => {
-  class PcmPlayer {
-    constructor(sampleRate = 24000) {
-      this.sampleRate = sampleRate;
-      this.ctx = null;
-      this.nextTime = 0;
-    }
-
-    async init() {
-      if (!this.ctx) {
-        this.ctx = new AudioContext({ sampleRate: this.sampleRate });
-        this.nextTime = this.ctx.currentTime;
-      }
-      if (this.ctx.state === 'suspended') await this.ctx.resume();
-    }
-
-    play(base64Data) {
-      if (!this.ctx || !base64Data) return;
-      const binary = atob(base64Data);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const pcm = new Int16Array(bytes.buffer);
-      const floats = new Float32Array(pcm.length);
-      for (let i = 0; i < pcm.length; i++) floats[i] = pcm[i] / 32768;
-
-      const buffer = this.ctx.createBuffer(1, floats.length, this.sampleRate);
-      buffer.copyToChannel(floats, 0);
-      const source = this.ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(this.ctx.destination);
-      const start = Math.max(this.nextTime, this.ctx.currentTime);
-      source.start(start);
-      this.nextTime = start + buffer.duration;
-    }
-
-    reset() {
-      this.nextTime = this.ctx?.currentTime ?? 0;
-    }
-  }
-
   const params = new URLSearchParams(location.search);
-  const mode = params.get('mode') || Store.result?.wsMode || 'viva';
+  const mode = params.get('mode') || Store.result?.liveMode || 'viva';
   const isViva = mode === 'viva';
   const topic = Store.topic;
   if (!topic) location.href = 'index.html';
@@ -48,376 +9,153 @@
   document.getElementById('kicker').textContent =
     mode === 'screen' ? 'Screen Reader' : 'Live Viva';
 
-  const statusEl = document.getElementById('status');
-  const subEl = document.getElementById('sub');
-  const errEl = document.getElementById('err');
-  const micBtn = document.getElementById('mic');
+  const vivaPanel = document.getElementById('vivaPanel');
+  const screenPanel = document.getElementById('screenPanel');
+  const statusEl = document.getElementById(isViva ? 'status' : 'statusScreen');
+  const subEl = document.getElementById(isViva ? 'sub' : 'subScreen');
+  const errEl = document.getElementById(isViva ? 'err' : 'errScreen');
   const sessionBtn = document.getElementById('sessionBtn');
-  const recordBtn = document.getElementById('recordBtn');
   const hintEl = document.getElementById(isViva ? 'hint' : 'hintScreen');
-  const camEl = document.getElementById('cam');
-  const vizEl = document.getElementById('viz');
-  const micRing = document.getElementById(isViva ? 'micRing' : 'micRingScreen');
-  const vivaControls = document.getElementById('vivaControls');
-  const screenControls = document.getElementById('screenControls');
   const liveStage = document.getElementById('liveStage');
   const liveFsBtn = document.getElementById('liveFsBtn');
+  const vizEl = document.getElementById(isViva ? 'viz' : 'vizScreen');
 
   if (isViva) {
-    vivaControls?.classList.remove('hidden');
-    screenControls?.classList.add('hidden');
+    vivaPanel?.classList.remove('hidden');
+    screenPanel?.classList.add('hidden');
   } else {
-    vivaControls?.classList.add('hidden');
-    screenControls?.classList.remove('hidden');
+    vivaPanel?.classList.add('hidden');
+    screenPanel?.classList.remove('hidden');
   }
 
-  let ws = null;
-  let sessionConnected = false;
-  let connecting = false;
-  let recording = false;
-  let mediaStream = null;
-  let audioCtx = null;
-  let processor = null;
-  let analyser = null;
-  let frameTimer = null;
-  let vizTimer = null;
-  const pcmOut = new PcmPlayer(24000);
+  const api = isViva ? '/api/viva' : '/api/screen';
+  let running = false;
+  let pollTimer = null;
 
-  function sendCtrl(type) {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify({ type }));
+  async function post(path, body) {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || data.error || `${path} failed (${res.status})`);
+    return data;
   }
 
-  function setVivaUi() {
-    if (!isViva || !recordBtn) return;
-
-    sessionBtn.classList.toggle('hidden', sessionConnected || connecting);
-    sessionBtn.disabled = connecting;
-    sessionBtn.textContent = connecting ? 'Connecting…' : 'Reconnect';
-
-    recordBtn.disabled = !sessionConnected || connecting;
-    recordBtn.textContent = recording ? 'Stop & send' : 'Record answer';
-    recordBtn.classList.toggle('on', recording);
-    recordBtn.setAttribute('aria-label', recording ? 'Stop and send answer' : 'Record answer');
-    micRing?.classList.toggle('live', recording);
-
-    if (connecting) {
-      statusEl.textContent = 'Connecting…';
-      statusEl.classList.remove('on');
-      hintEl.textContent = 'Setting up mic and AI session';
-    } else if (!sessionConnected) {
-      statusEl.textContent = 'Not connected';
-      statusEl.classList.remove('on');
-      hintEl.textContent = 'Tap Reconnect if the session did not start';
-    } else if (recording) {
-      statusEl.textContent = 'Recording your answer…';
-      statusEl.classList.add('on');
-      hintEl.textContent = 'Tap Stop & send when you finish speaking';
-    } else {
-      statusEl.textContent = 'Ready — tap Record answer';
-      statusEl.classList.remove('on');
-      hintEl.textContent = 'Only your recorded chunk is sent (no background noise)';
-    }
+  async function getStatus() {
+    const res = await fetch(`${API_BASE}${api}/status`);
+    if (!res.ok) throw new Error('Status check failed');
+    return res.json();
   }
 
-  function setScreenStatus(text, live = false) {
-    statusEl.textContent = text;
-    statusEl.classList.toggle('on', live);
-    micBtn.classList.toggle('on', live);
-    micRing?.classList.toggle('live', live);
-    hintEl.textContent = live ? 'Tap to end session' : 'Tap mic to share screen and start';
+  function setSubtitle(text) {
+    if (!text) return;
+    subEl.innerHTML = `<p>${String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`;
   }
 
   function showErr(msg) {
     errEl.textContent = msg;
     errEl.classList.remove('hidden');
+    sessionBtn?.classList.remove('hidden');
+  }
+
+  function setLiveUi(live) {
+    running = live;
+    statusEl.textContent = live ? 'Live' : 'Offline';
+    statusEl.classList.toggle('ready', live);
+    statusEl.classList.toggle('live', live);
+    vizEl?.classList.toggle('active', live);
+    sessionBtn?.classList.toggle('hidden', live);
+
     if (isViva) {
-      sessionBtn.classList.remove('hidden');
-      sessionBtn.textContent = 'Reconnect';
-    }
-  }
-
-  function startViz() {
-    if (!analyser || !vizEl) return;
-    const bars = vizEl.querySelectorAll('.viz-bar');
-    vizTimer = setInterval(() => {
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(data);
-      bars.forEach((bar, i) => {
-        const v = data[i * 4] || 0;
-        bar.style.height = `${Math.max(8, (v / 255) * 100)}%`;
-      });
-    }, 80);
-  }
-
-  function stopViz() {
-    if (vizTimer) clearInterval(vizTimer);
-    vizTimer = null;
-    vizEl?.querySelectorAll('.viz-bar').forEach((b) => { b.style.height = '12%'; });
-  }
-
-  function waitForSocketOpen(socket, timeoutMs = 20000) {
-    return new Promise((resolve, reject) => {
-      if (socket.readyState === WebSocket.OPEN) {
-        resolve();
-        return;
-      }
-      const t = setTimeout(() => {
-        cleanup();
-        reject(new Error('Connection timeout'));
-      }, timeoutMs);
-      const onOpen = () => { cleanup(); resolve(); };
-      const onErr = () => { cleanup(); reject(new Error('WebSocket failed')); };
-      const cleanup = () => {
-        clearTimeout(t);
-        socket.removeEventListener('open', onOpen);
-        socket.removeEventListener('error', onErr);
-      };
-      socket.addEventListener('open', onOpen);
-      socket.addEventListener('error', onErr);
-    });
-  }
-
-  async function getScreenStream() {
-    if (navigator.mediaDevices.getDisplayMedia) {
-      try {
-        return await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 1 },
-          audio: false,
-        });
-      } catch (_) { /* fall through */ }
-    }
-    return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-  }
-
-  async function setupMedia() {
-    if (mode === 'screen') {
-      const displayStream = await getScreenStream();
-      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStream = new MediaStream([
-        ...displayStream.getVideoTracks(),
-        ...micStream.getAudioTracks(),
-      ]);
-      const videoTrack = displayStream.getVideoTracks()[0];
-      if (videoTrack) {
-        camEl.srcObject = displayStream;
-        camEl.classList.remove('hidden');
-        videoTrack.onended = () => {
-          if (sessionConnected) endSession(true);
-        };
-      }
+      hintEl.textContent = live
+        ? 'Speak naturally — the examiner listens and replies through your speakers'
+        : 'Tap Reconnect to start again';
     } else {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      hintEl.textContent = live
+        ? 'Server is watching your screen and listening — replies play on your speakers'
+        : 'Tap Reconnect to start again';
     }
   }
 
-  function setupWsHandlers() {
-    ws.onmessage = (ev) => {
-      const msg = JSON.parse(ev.data);
-      if (msg.type === 'status') {
-        if (msg.status === 'connected') {
-          sessionConnected = true;
-          connecting = false;
-          if (isViva) setVivaUi();
-          else setScreenStatus('Live — speak now', true);
-        } else if (!isViva) {
-          setScreenStatus(msg.status, msg.status === 'connected');
-        }
-      } else if (msg.type === 'text') {
-        subEl.textContent = msg.text;
-      } else if (msg.type === 'audio') {
-        pcmOut.play(msg.data);
-      } else if (msg.type === 'error') {
-        showErr(msg.error);
-      }
-    };
-    ws.onerror = () => showErr('WebSocket error — is the backend running?');
-    ws.onclose = () => {
-      sessionConnected = false;
-      connecting = false;
-      recording = false;
-      if (isViva) setVivaUi();
-      else setScreenStatus('Disconnected');
-      teardownAudio(false);
-    };
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(async () => {
+      try {
+        const st = await getStatus();
+        setLiveUi(!!st.running);
+        if (st.last_text) setSubtitle(st.last_text);
+      } catch (_) { /* ignore transient poll errors */ }
+    }, 1500);
   }
 
-  async function connectSession() {
-    errEl.classList.add('hidden');
-    if (sessionConnected || connecting) return;
+  function stopPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  }
 
-    connecting = true;
-    if (isViva) setVivaUi();
-    else setScreenStatus('Connecting…');
+  async function startSession() {
+    errEl.classList.add('hidden');
+    statusEl.textContent = 'Starting…';
+    statusEl.classList.remove('ready', 'live');
+    vizEl?.classList.remove('active');
+    hintEl.textContent = 'Launching backend session…';
 
     try {
-      await pcmOut.init();
-      await setupMedia();
-
-      ws = new WebSocket(wsUrl(mode));
-      setupWsHandlers();
-      await waitForSocketOpen(ws);
-
-      startMicPcm();
-      if (mode === 'screen' && mediaStream.getVideoTracks().length) startVideoFrames();
-    } catch (e) {
-      connecting = false;
-      showErr(e.message || String(e));
-      endSession(false);
-    } finally {
-      if (isViva) setVivaUi();
-    }
-  }
-
-  function startMicPcm() {
-    audioCtx = new AudioContext({ sampleRate: 16000 });
-    const source = audioCtx.createMediaStreamSource(mediaStream);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 64;
-    processor = audioCtx.createScriptProcessor(4096, 1, 1);
-    processor.onaudioprocess = (e) => {
-      const shouldSend = isViva ? recording : sessionConnected;
-      if (!shouldSend || !ws || ws.readyState !== WebSocket.OPEN) return;
-
-      const input = e.inputBuffer.getChannelData(0);
-      const pcm = new Int16Array(input.length);
-      for (let i = 0; i < input.length; i++) {
-        pcm[i] = Math.max(-32768, Math.min(32767, input[i] * 32768));
+      if (isViva) {
+        await post(`${api}/start`, { topic });
+      } else {
+        await post(`${api}/start?mode=screen`);
       }
-      const bytes = new Uint8Array(pcm.buffer);
-      let bin = '';
-      bytes.forEach((b) => { bin += String.fromCharCode(b); });
-      ws.send(JSON.stringify({
-        type: 'audio',
-        mime_type: 'audio/pcm',
-        data: btoa(bin),
-      }));
-    };
-    source.connect(analyser);
-    analyser.connect(processor);
-    processor.connect(audioCtx.destination);
-    startViz();
+      setLiveUi(true);
+      startPolling();
+    } catch (e) {
+      showErr(e.message || String(e));
+      setLiveUi(false);
+    }
   }
 
-  function startVideoFrames() {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    frameTimer = setInterval(() => {
-      if (!ws || ws.readyState !== WebSocket.OPEN || camEl.readyState < 2) return;
-      canvas.width = camEl.videoWidth || 640;
-      canvas.height = camEl.videoHeight || 480;
-      ctx.drawImage(camEl, 0, 0, canvas.width, canvas.height);
-      ws.send(JSON.stringify({
-        type: 'image',
-        mime_type: 'image/jpeg',
-        data: canvas.toDataURL('image/jpeg', 0.65).split(',')[1],
-      }));
-    }, 1000);
-  }
-
-  function startRecording() {
-    if (!sessionConnected || recording || connecting) return;
-    recording = true;
-    sendCtrl('activity_start');
-    setVivaUi();
-  }
-
-  function stopRecording() {
-    if (!recording) return;
-    recording = false;
-    sendCtrl('activity_end');
-    setVivaUi();
-  }
-
-  function teardownAudio(closeWs) {
-    stopViz();
-    recording = false;
-    connecting = false;
-    pcmOut.reset();
-    if (frameTimer) clearInterval(frameTimer);
-    frameTimer = null;
-    if (processor) {
-      processor.disconnect();
-      processor = null;
-    }
-    if (analyser) {
-      analyser.disconnect();
-      analyser = null;
-    }
-    if (audioCtx) {
-      audioCtx.close();
-      audioCtx = null;
-    }
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((t) => t.stop());
-      mediaStream = null;
-    }
-    if (closeWs && ws) {
-      ws.close();
-      ws = null;
-    }
-    camEl.classList.add('hidden');
-    camEl.srcObject = null;
-    sessionConnected = false;
-    if (isViva) setVivaUi();
-  }
-
-  function endSession(userInitiated = true) {
-    if (recording) stopRecording();
-    teardownAudio(true);
-    if (!isViva && userInitiated) setScreenStatus('Tap mic to share screen and start');
+  async function stopSession() {
+    try {
+      await post(`${api}/stop`);
+    } catch (_) { /* best effort */ }
+    stopPolling();
+    setLiveUi(false);
   }
 
   function setupFullscreen() {
     if (!liveStage || !liveFsBtn) return;
-
     const isFs = () =>
       document.fullscreenElement === liveStage ||
       document.webkitFullscreenElement === liveStage;
 
-    const enter = () => {
-      if (liveStage.requestFullscreen) return liveStage.requestFullscreen();
-      if (liveStage.webkitRequestFullscreen) return liveStage.webkitRequestFullscreen();
-    };
-
-    const exit = () => {
-      if (document.exitFullscreen) return document.exitFullscreen();
-      if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
-    };
+    liveFsBtn.addEventListener('click', () => {
+      if (isFs()) {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else if (liveStage.requestFullscreen) {
+        liveStage.requestFullscreen();
+      } else if (liveStage.webkitRequestFullscreen) {
+        liveStage.webkitRequestFullscreen();
+      }
+    });
 
     const sync = () => {
       liveFsBtn.textContent = isFs() ? '⛶ Exit fullscreen' : '⛶ Fullscreen';
-      liveFsBtn.setAttribute('aria-label', isFs() ? 'Exit fullscreen' : 'Enter fullscreen');
     };
-
-    liveFsBtn.addEventListener('click', () => {
-      if (isFs()) exit();
-      else enter();
-    });
-
     document.addEventListener('fullscreenchange', sync);
     document.addEventListener('webkitfullscreenchange', sync);
   }
 
   setupFullscreen();
-
-  if (isViva) {
-    setVivaUi();
-    sessionBtn?.addEventListener('click', () => connectSession());
-    recordBtn?.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (recording) stopRecording();
-      else startRecording();
-    });
-    connectSession();
-  } else {
-    micBtn?.addEventListener('click', () => {
-      if (sessionConnected) endSession(true);
-      else connectSession();
-    });
-  }
+  sessionBtn?.addEventListener('click', startSession);
+  setLiveUi(false);
+  startSession();
 
   window.addEventListener('beforeunload', () => {
-    if (sessionConnected) endSession(false);
+    if (running) {
+      fetch(`${API_BASE}${api}/stop`, { method: 'POST', keepalive: true }).catch(() => {});
+    }
   });
 })();

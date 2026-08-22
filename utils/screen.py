@@ -58,6 +58,7 @@ CONFIG: LiveConnectConfig = types.LiveConnectConfig(
 class AudioLoop:
     def __init__(self, video_mode=DEFAULT_MODE):
         self.video_mode = video_mode
+        self.last_text = ""
         self.audio_in_queue = None
         self.out_queue = None
         self.session = None
@@ -174,6 +175,7 @@ class AudioLoop:
                     if self.audio_in_queue is not None:
                         self.audio_in_queue.put_nowait(data)
                 if text := response.text:
+                    self.last_text = text
                     print(text, end="", flush=True)
             if self.audio_in_queue is not None:
                 while not self.audio_in_queue.empty():
@@ -239,15 +241,28 @@ class ScreenService:
     _instance = None
     _task: Optional[asyncio.Task] = None
     _audio_loop: Optional[AudioLoop] = None
+    _mode: str = DEFAULT_MODE
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
+    def _running(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    def status(self) -> dict:
+        loop = self._audio_loop
+        return {
+            "running": self._running(),
+            "mode": self._mode,
+            "last_text": loop.last_text if loop else "",
+        }
+
     async def start(self, mode: str = "screen"):
-        if self._task and not self._task.done():
-            return {"status": "already running"}
+        if self._running():
+            return {"status": "already running", **self.status()}
+        self._mode = mode
         self._audio_loop = AudioLoop(video_mode=mode)
         self._task = asyncio.create_task(self._audio_loop.run())
         return {"status": "started", "mode": mode}
@@ -259,7 +274,10 @@ class ScreenService:
                 await self._task
             except asyncio.CancelledError:
                 pass
+            except Exception as exc:
+                return {"status": "error", "error": str(exc)}
             self._task = None
             self._audio_loop = None
+            self._mode = DEFAULT_MODE
             return {"status": "stopped"}
         return {"status": "not running"}

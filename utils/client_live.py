@@ -35,8 +35,13 @@ def _client():
     return genai.Client(http_options={"api_version": "v1beta"}, api_key=key)
 
 
-def live_config(mode: str) -> LiveConnectConfig:
+def live_config(mode: str, topic: str = "") -> LiveConnectConfig:
     instruction = VIVA_INSTRUCTION if mode == "viva" else SCREEN_INSTRUCTION
+    if mode == "viva" and topic.strip():
+        instruction += (
+            f"\n\nThe student's examination topic is: {topic.strip()}. "
+            "Use this topic for the viva. Greet briefly and ask your first question."
+        )
     kwargs = dict(
         response_modalities=[types.Modality.AUDIO],
         speech_config=types.SpeechConfig(
@@ -61,13 +66,22 @@ def _b64_to_bytes(data) -> bytes:
     return base64.b64decode(data)
 
 
-async def run_client_session(ws: WebSocket, mode: str) -> None:
+async def run_client_session(ws: WebSocket, mode: str, topic: str = "") -> None:
     """Relay client camera/mic (and optional frames) to Gemini Live; stream audio back."""
     async with _client().aio.live.connect(
         model=settings.live_model,
-        config=live_config(mode),
+        config=live_config(mode, topic),
     ) as session:
         await ws.send_json({"type": "status", "status": "connected", "mode": mode})
+
+        if mode == "viva" and topic.strip():
+            await session.send_client_content(
+                turns=types.Content(
+                    role="user",
+                    parts=[types.Part(text=f'My examination topic is "{topic.strip()}". Please begin the viva.')],
+                ),
+                turn_complete=True,
+            )
 
         async def from_client():
             while True:
@@ -100,6 +114,14 @@ async def run_client_session(ws: WebSocket, mode: str) -> None:
                 elif kind in ("activity_end", "turn_complete"):
                     await session.send_realtime_input(activity_end=types.ActivityEnd())
                     await session.send_realtime_input(audio_stream_end=True)
+                elif kind == "text" and data.get("text"):
+                    await session.send_client_content(
+                        turns=types.Content(
+                            role="user",
+                            parts=[types.Part(text=str(data["text"]))],
+                        ),
+                        turn_complete=True,
+                    )
                 elif mode != "viva" and (
                     kind in ("image", "video", "frame")
                     or mime.startswith("image/")

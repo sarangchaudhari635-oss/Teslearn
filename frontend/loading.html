@@ -106,7 +106,7 @@
         stopEta();
         await new Promise((r) => setTimeout(r, 500));
         if (kind === 'viva' || kind === 'screenReader') {
-          location.href = `live.html?mode=${result.wsMode || (kind === 'viva' ? 'viva' : 'screen')}`;
+          location.href = `live.html?mode=${result.liveMode || (kind === 'viva' ? 'viva' : 'screen')}`;
         } else if (kind === 'chat') {
           location.href = 'chat.html';
         } else {
