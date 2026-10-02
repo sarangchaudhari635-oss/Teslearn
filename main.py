@@ -2,7 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from pathlib import Path
+
 from config import CLIPS_DIR, COMICS_DIR, LABS_DIR, MINDMAPS_DIR, NOTES_DIR, PODCASTS_DIR
+
+FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 from routes.chat import router as chat_router
 from routes.guardrail import router as guardrail_router
 from routes.client import router as client_router
@@ -42,6 +46,7 @@ app.mount("/mindmaps", StaticFiles(directory=MINDMAPS_DIR, html=True), name="min
 app.mount("/comics", StaticFiles(directory=COMICS_DIR), name="comics")
 app.mount("/notes-assets", StaticFiles(directory=NOTES_DIR), name="notes-assets")
 app.mount("/labs", StaticFiles(directory=LABS_DIR, html=True), name="labs")
+app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 
 @app.get("/health")
